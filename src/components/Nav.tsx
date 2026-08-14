@@ -54,7 +54,7 @@ export default function Nav() {
               </Link>
             ))}
             <Link
-              to="/home"
+              to="/repair"
               className="text-sm font-medium px-4 py-2 rounded-sm transition-all duration-150"
               style={{
                 background: "#6C79C0",
