@@ -11,7 +11,7 @@ import Footer from "../components/Footer"
 const TEAM = [
   { initials: "HV", name: "Haider Vadgamwala", color: "#6C79C0", rollno: "25bca076" },
   { initials: "NC", name: "N Chaitanya", color: "#8B7355", rollno: "25bca090" },
-  { initials: "BG", name: "Bharath Gowda", color: "#C0906C", rollno: "25bca067" },
+  { initials: "BG", name: "Bharath G", color: "#C0906C", rollno: "25bca067" },
   { initials: "AV", name: "Arya Veer", color: "#87A87D", rollno: "25bca066" },
 ]
 
