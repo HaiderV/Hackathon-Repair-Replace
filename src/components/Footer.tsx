@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom"
 import { IconWrench, IconMail, IconGithub, IconLinkedin } from "./Icons"
 
+const logo = "/logo.png";
+
 export default function Footer() {
   return (
     <footer
@@ -9,24 +11,31 @@ export default function Footer() {
     >
       <div className="max-w-6xl mx-auto px-5 py-14 grid grid-cols-1 md:grid-cols-3 gap-10">
         <div>
-          <div className="flex items-center gap-2.5 mb-3">
-            <div
-              className="flex items-center justify-center rounded-sm"
-              style={{ width: 30, height: 30, background: "#6C79C0" }}
-            >
-              <IconWrench size={15} className="text-white -rotate-12" />
-            </div>
+          <Link
+            to="/"
+            className="flex items-center gap-1 group mb-3"
+            style={{
+              textDecoration: "none",
+              background: "none",
+              border: "none",
+              padding: 0,
+              display: "inline-flex",
+            }}
+          >
+            <img src={logo} alt="Logo" style={{ height: "54px", width: "auto" }} />
             <span
               style={{
-                fontFamily: "Fraunces, serif",
-                fontWeight: 600,
-                fontSize: "1rem",
+                fontFamily: "Fraunces, Georgia, serif",
+                fontWeight: 700,
+                fontSize: "1.35rem",
+                letterSpacing: "-0.01em",
                 color: "#F4EDE0",
+                lineHeight: 1,
               }}
             >
-              Repair<span style={{ color: "#E6C79C" }}>Replace</span>
+              Repair<span style={{ color: "#6C79C0" }}>Replace</span>
             </span>
-          </div>
+          </Link>
           <p
             style={{
               color: "#9A8E7E",

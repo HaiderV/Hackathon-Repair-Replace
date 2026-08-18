@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { IconX, IconMenu } from "./Icons"
-import Logo from "./Logo"
+
+const logo = "/logo.png"
 
 export default function Nav() {
   const [open, setOpen] = useState(false)
@@ -28,6 +29,7 @@ export default function Nav() {
           <Link
             to="/"
             onClick={() => setOpen(false)}
+            className="flex items-center gap-1 group"
             style={{
               textDecoration: "none",
               background: "none",
@@ -35,7 +37,19 @@ export default function Nav() {
               padding: 0,
             }}
           >
-            <Logo />
+            <img src={logo} alt="Logo" style={{ height: "62px", width: "auto" }} />
+            <span
+              style={{
+                fontFamily: "Fraunces, Georgia, serif",
+                fontWeight: 700,
+                fontSize: "1.45rem",
+                letterSpacing: "-0.01em",
+                color: "#2B2118",
+                lineHeight: 1,
+              }}
+            >
+              Repair<span style={{ color: "#6C79C0" }}>Replace</span>
+            </span>
           </Link>
 
           {/* Desktop Nav */}
@@ -104,7 +118,6 @@ export default function Nav() {
           className="flex items-center justify-between pb-4 mb-6"
           style={{ borderBottom: "1px solid rgba(205,187,157,0.6)" }}
         >
-          <Logo />
           <button
             onClick={() => setOpen(false)}
             className="text-[#7A6A58] hover:text-[#2B2118] p-1 transition-colors"
