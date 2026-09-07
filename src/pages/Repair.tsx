@@ -5,6 +5,7 @@ import ChatInput, { type ChatInputHandle } from "../components/chat/ChatInput"
 import TypingIndicator from "../components/chat/TypingIndicator"
 import MetricsSidebar from "../components/analysis/MetricsSidebar"
 import ConfirmResetModal from "../components/chat/ConfirmResetModal"
+import ApiNoticeModal from "../components/chat/ApiNoticeModal"
 import {
   analyzeProblem,
   startRepairReplace,
@@ -21,6 +22,8 @@ import {
   IconRotateCcw,
   IconSliders,
   IconAlertTriangle,
+  IconInfo,
+  IconClock,
 } from "../components/Icons"
 
 const LOCAL_STORAGE_SESSION_KEY = "repair_session_id"
@@ -61,6 +64,8 @@ export default function RepairPage() {
   const [errorBanner, setErrorBanner] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showResetModal, setShowResetModal] = useState(false)
+  const [showApiNoticeModal, setShowApiNoticeModal] = useState(false)
+  const [isRestoredSession, setIsRestoredSession] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [failedAction, setFailedAction] = useState<
     | {
@@ -98,6 +103,7 @@ export default function RepairPage() {
         if (response.success && response.data) {
           const session = response.data
           setSessionId(session.sessionId)
+          setIsRestoredSession(true)
 
           if (session.inputAnalysis) {
             setInputAnalysis(session.inputAnalysis)
@@ -363,6 +369,7 @@ export default function RepairPage() {
     setStage2Result(null)
     setErrorBanner(null)
     setFailedAction(null)
+    setIsRestoredSession(false)
     setIsResetting(false)
     setShowResetModal(false)
   }
@@ -373,6 +380,9 @@ export default function RepairPage() {
   }
 
   const confidenceScore = inputAnalysis?.confidence || 0
+  const isQuotaError = Boolean(
+    errorBanner && /quota|resource_exhausted|429|rate limit/i.test(errorBanner),
+  )
 
   return (
     <PageLayout>
@@ -394,6 +404,11 @@ export default function RepairPage() {
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
                     AI Active
                   </span>
+                  {isRestoredSession && messages.length > 0 && (
+                    <span className="hidden md:inline-flex items-center gap-1 rounded-full bg-[#EAD8BE]/70 px-2 py-0.5 text-[10px] font-semibold text-[#523D2B] border border-[#2B2118]/15 shrink-0" title="Previous session automatically restored from local storage">
+                      Restored Session
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] sm:text-xs text-[#523D2B]/80 mt-0.5 truncate">
                   {inputAnalysis?.itemName
@@ -436,10 +451,20 @@ export default function RepairPage() {
                 </div>
               )}
 
+              {/* Free API Quota & System Info Button */}
+              <button
+                onClick={() => setShowApiNoticeModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-[#2B2118]/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-[#523D2B] hover:bg-[#EAD8BE] hover:text-[#2B2118] transition-colors cursor-pointer"
+                title="Free API Quota & Diagnostic Notice"
+              >
+                <IconInfo size={15} />
+                <span className="hidden sm:inline">API Info</span>
+              </button>
+
               {/* Sidebar drawer toggle on mobile/tablet */}
               <button
                 onClick={() => setSidebarOpen((prev) => !prev)}
-                className="lg:hidden flex items-center gap-1.5 rounded-xl border border-[#2B2118]/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-[#2B2118] hover:bg-[#EAD8BE] transition-colors"
+                className="lg:hidden flex items-center gap-1.5 rounded-xl border border-[#2B2118]/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-[#2B2118] hover:bg-[#EAD8BE] transition-colors cursor-pointer"
                 title="Toggle Metrics"
               >
                 <IconSliders size={16} />
@@ -455,7 +480,7 @@ export default function RepairPage() {
               {(messages.length > 0 || sessionId) && (
                 <button
                   onClick={handleOpenResetModal}
-                  className="flex items-center gap-1.5 rounded-xl border border-[#2B2118]/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-[#523D2B] transition-all hover:border-[#E07A5F] hover:text-[#9E3E26] hover:bg-red-50/50"
+                  className="flex items-center gap-1.5 rounded-xl border border-[#2B2118]/15 bg-white/80 px-2.5 py-1.5 text-xs font-semibold text-[#523D2B] transition-all hover:border-[#E07A5F] hover:text-[#9E3E26] hover:bg-red-50/50 cursor-pointer"
                   title="Start fresh session"
                 >
                   <IconRotateCcw size={14} />
@@ -469,38 +494,84 @@ export default function RepairPage() {
         {/* Error Alert Banner */}
         {errorBanner && (
           <div className="mx-auto mt-4 w-full max-w-4xl px-3 sm:px-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-red-300 bg-red-100/95 p-3.5 sm:p-4 text-xs text-red-900 shadow-sm animate-fade-in">
-              <div className="flex items-start sm:items-center gap-2.5 min-w-0">
-                <span className="flex h-6 w-6 shrink-0 aspect-square min-w-[24px] min-h-[24px] items-center justify-center rounded-full bg-red-200 text-red-800 font-bold text-xs">
-                  !
-                </span>
-                <div className="min-w-0">
-                  <span className="font-bold text-red-950 block sm:inline mr-1">Diagnostic Error:</span>
-                  <span className="text-red-900 break-words">{errorBanner}</span>
+            {isQuotaError ? (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-amber-400 bg-amber-50/95 p-3.5 sm:p-4 text-xs text-amber-950 shadow-sm animate-fade-in">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                  <span className="flex h-7 w-7 shrink-0 aspect-square min-w-[28px] min-h-[28px] items-center justify-center rounded-xl bg-amber-200 text-amber-900 font-bold text-xs shadow-xs">
+                    <IconClock size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <span className="font-bold text-amber-950 block sm:inline mr-1">
+                      Gemini Free-Tier Quota Limit (HTTP 429):
+                    </span>
+                    <span className="text-amber-900 break-words">
+                      The free-tier rate limit was reached. Please wait ~30–60 seconds for the window to reset, then retry.
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <button
+                    onClick={() => setShowApiNoticeModal(true)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-200/90 hover:bg-amber-300 text-amber-950 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    <IconInfo size={13} />
+                    <span>Info</span>
+                  </button>
+                  {failedAction && (
+                    <button
+                      onClick={handleRetry}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2B2118] hover:bg-[#6C79C0] text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer active:scale-95"
+                    >
+                      <IconRotateCcw size={13} className="shrink-0" />
+                      <span>Retry</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setErrorBanner(null)
+                      setFailedAction(null)
+                    }}
+                    className="text-amber-800 font-bold hover:text-amber-950 p-1.5 rounded-lg hover:bg-amber-200/60 text-xs transition-colors cursor-pointer"
+                    title="Dismiss error"
+                  >
+                    ✕
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-                {failedAction && (
+            ) : (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl border border-red-300 bg-red-100/95 p-3.5 sm:p-4 text-xs text-red-900 shadow-sm animate-fade-in">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                  <span className="flex h-6 w-6 shrink-0 aspect-square min-w-[24px] min-h-[24px] items-center justify-center rounded-full bg-red-200 text-red-800 font-bold text-xs">
+                    !
+                  </span>
+                  <div className="min-w-0">
+                    <span className="font-bold text-red-950 block sm:inline mr-1">Diagnostic Error:</span>
+                    <span className="text-red-900 break-words">{errorBanner}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  {failedAction && (
+                    <button
+                      onClick={handleRetry}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer active:scale-95"
+                    >
+                      <IconRotateCcw size={13} className="shrink-0" />
+                      <span>Retry</span>
+                    </button>
+                  )}
                   <button
-                    onClick={handleRetry}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer active:scale-95"
+                    onClick={() => {
+                      setErrorBanner(null)
+                      setFailedAction(null)
+                    }}
+                    className="text-red-700 font-bold hover:text-red-950 p-1.5 rounded-lg hover:bg-red-200/60 text-xs transition-colors cursor-pointer"
+                    title="Dismiss error"
                   >
-                    <IconRotateCcw size={13} className="shrink-0" />
-                    <span>Retry</span>
+                    ✕
                   </button>
-                )}
-                <button
-                  onClick={() => {
-                    setErrorBanner(null)
-                    setFailedAction(null)
-                  }}
-                  className="text-red-700 font-bold hover:text-red-950 p-1.5 rounded-lg hover:bg-red-200/60 text-xs transition-colors cursor-pointer"
-                  title="Dismiss error"
-                >
-                  ✕
-                </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -589,31 +660,66 @@ export default function RepairPage() {
 
               {/* Failed Request Retry Prompt */}
               {failedAction && !isStage1Loading && !isStage2Loading && (
-                <div className="flex items-start gap-3 rounded-2xl border border-red-200/80 bg-red-50/85 p-3.5 sm:p-4 text-xs text-red-900 shadow-xs animate-fade-in">
-                  <div className="flex h-7 w-7 shrink-0 aspect-square min-w-[28px] min-h-[28px] items-center justify-center rounded-xl bg-red-200 text-red-800 font-bold">
-                    <IconRotateCcw size={15} />
+                <div
+                  className={`flex items-start gap-3 rounded-2xl border p-3.5 sm:p-4 text-xs shadow-xs animate-fade-in ${
+                    isQuotaError
+                      ? "border-amber-300 bg-amber-50/90 text-amber-950"
+                      : "border-red-200/80 bg-red-50/85 text-red-900"
+                  }`}
+                >
+                  <div
+                    className={`flex h-7 w-7 shrink-0 aspect-square min-w-[28px] min-h-[28px] items-center justify-center rounded-xl font-bold ${
+                      isQuotaError
+                        ? "bg-amber-200 text-amber-900"
+                        : "bg-red-200 text-red-800"
+                    }`}
+                  >
+                    {isQuotaError ? <IconClock size={16} /> : <IconRotateCcw size={15} />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-red-950 text-xs sm:text-sm">
-                      AI Diagnostic was interrupted
+                    <h4 className="font-bold text-xs sm:text-sm">
+                      {isQuotaError
+                        ? "Gemini Free-Tier Rate Limit Reached"
+                        : "AI Diagnostic was interrupted"}
                     </h4>
-                    <p className="mt-0.5 text-red-800/90 text-xs">
-                      {errorBanner || "The request could not be completed. You can retry without re-entering your message."}
+                    <p className="mt-0.5 text-xs opacity-90 leading-relaxed">
+                      {isQuotaError
+                        ? "The free Google Gemini API rate limit was temporarily reached. Please wait ~30–60 seconds for the window to reset and tap Retry."
+                        : errorBanner ||
+                          "The request could not be completed. You can retry without re-entering your message."}
                     </p>
-                    <div className="mt-2.5 flex items-center gap-2">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
                       <button
                         onClick={handleRetry}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95"
+                        className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-xs transition-all cursor-pointer active:scale-95 ${
+                          isQuotaError
+                            ? "bg-[#2B2118] hover:bg-[#6C79C0] text-white"
+                            : "bg-red-700 hover:bg-red-800 text-white"
+                        }`}
                       >
                         <IconRotateCcw size={13} />
-                        <span>Retry {failedAction.type === "stage2" ? "Comparison" : "Message"}</span>
+                        <span>
+                          Retry{" "}
+                          {failedAction.type === "stage2"
+                            ? "Comparison"
+                            : "Message"}
+                        </span>
                       </button>
+                      {isQuotaError && (
+                        <button
+                          onClick={() => setShowApiNoticeModal(true)}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-amber-200/90 hover:bg-amber-300 text-amber-950 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          <IconInfo size={13} />
+                          <span>Quota Info</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           setFailedAction(null)
                           setErrorBanner(null)
                         }}
-                        className="px-2.5 py-1.5 text-xs text-red-700 hover:text-red-950 font-semibold cursor-pointer"
+                        className="px-2.5 py-1.5 text-xs font-semibold hover:underline cursor-pointer"
                       >
                         Dismiss
                       </button>
@@ -717,6 +823,12 @@ export default function RepairPage() {
           onClose={() => setShowResetModal(false)}
           onConfirm={handleConfirmReset}
           isDeleting={isResetting}
+        />
+
+        {/* Free-Tier API Quota & System Notice Modal */}
+        <ApiNoticeModal
+          isOpen={showApiNoticeModal}
+          onClose={() => setShowApiNoticeModal(false)}
         />
       </div>
     </PageLayout>
