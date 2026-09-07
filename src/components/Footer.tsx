@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
 import { IconWrench, IconMail, IconGithub, IconLinkedin } from "./Icons"
+import logo from "../assets/logo.png"
 
 export default function Footer() {
   return (
@@ -20,7 +21,7 @@ export default function Footer() {
               display: "inline-flex",
             }}
           >
-            <img src="/logo.png" alt="Logo" style={{ height: "54px", width: "auto" }} />
+            <img src={logo} alt="Logo" style={{ height: "54px", width: "auto" }} />
             <span
               style={{
                 fontFamily: "Fraunces, Georgia, serif",
