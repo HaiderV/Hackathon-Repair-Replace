@@ -1,7 +1,15 @@
 {
-  "description": "This web application streamlines project management by enabling teams to collaborate, track progress, and optimize workflows for enhanced productivity.",
+  "title": "RepairReplace - AI-Powered Device Repair & Replacement Diagnostics",
+  "description": "Diagnose device faults, calculate parts & labor costs, compare repair vs replace decisions, and access DIY repair manuals powered by AI.",
+  "language": "en",
+  "icons": {
+    "icon": "/logo.png"
+  },
+  "openGraph": {
+    "image": "/logo.png"
+  },
   "robots": {
-    "index": false
+    "index": true
   },
   "accessibility": {
     "addBypassLinks": false,
