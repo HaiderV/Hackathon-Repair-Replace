@@ -575,7 +575,7 @@ export default function Landing() {
               repair at a time.
             </p>
             <button
-              onClick={() => navigate("/home")}
+              onClick={() => navigate("/repair")}
               className="inline-flex items-center gap-2.5 px-7 py-4 rounded-sm font-semibold cursor-pointer"
               style={{
                 background: "#E6C79C",

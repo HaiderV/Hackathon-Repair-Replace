@@ -118,7 +118,7 @@ export default function Footer() {
           </p>
           <div className="flex flex-col gap-3">
             <a
-              href="mailto:25bca076@caias.in"
+              href="mailto:haidervadgamwal2@gmail.com"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2.5"
@@ -130,7 +130,7 @@ export default function Footer() {
               onMouseEnter={(e) => (e.currentTarget.style.color = "#F4EDE0")}
               onMouseLeave={(e) => (e.currentTarget.style.color = "#9A8E7E")}
             >
-              <IconMail size={15} /> 25bca076@caias.in
+              <IconMail size={15} /> haidervadgamwal2@gmail.com
             </a>
             <div className="flex gap-3 mt-1">
               <a
