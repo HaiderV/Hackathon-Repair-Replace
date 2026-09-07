@@ -127,7 +127,7 @@ const searchYouTubeVideos = async (
                 return {
                     title: entry.snippet.title,
                     url: `https://www.youtube.com/watch?v=${entry.id.videoId}`,
-                    description: entry.snippet.description,
+                    description: entry.snippet.description || "YouTube repair walkthrough video.",
                     source: "YouTube",
                     ...(thumbnail ? { thumbnail } : {}),
                 };

@@ -110,16 +110,20 @@ Safety warning: ${input.imageAnalysis.safetyWarning || "None"}`;
                 problemSummary,
                 inputInformation,
             );
-        } catch (error) {
+        } catch (error: any) {
             console.error(
                 "Repair/replace AI analysis failed:",
                 error,
             );
 
-            return res.status(503).json({
+            const is429 = error?.status === 429 || /quota|resource_exhausted|429/i.test(String(error));
+            const message = is429
+                ? "AI API rate limit or quota reached (HTTP 429). Please verify your GEMINI_API_KEY in backend/.env."
+                : (error?.message || "Repair/replace AI service is temporarily unavailable. Please try again later.");
+
+            return res.status(is429 ? 429 : 503).json({
                 success: false,
-                message:
-                    "Repair/replace AI service is temporarily unavailable. Please try again later.",
+                message,
             });
         }
 
@@ -177,15 +181,15 @@ Safety warning: ${input.imageAnalysis.safetyWarning || "None"}`;
                 resources,
             },
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error(
             "Repair/replace controller error:",
-            error,
+            error?.stack || error?.message || error,
         );
 
         return res.status(500).json({
             success: false,
-            message: "Internal server error",
+            message: error?.message || "Internal server error",
         });
     }
 };

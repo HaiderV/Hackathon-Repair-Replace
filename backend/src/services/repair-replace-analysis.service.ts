@@ -18,10 +18,16 @@ if (fs.existsSync(rootEnvPath)) {
   dotenv.config({ path: rootEnvPath });
 }
 
-const getAiClient = () => {
+export const getAiClient = () => {
+  // Load root .env first as fallback
+  if (fs.existsSync(rootEnvPath)) dotenv.config({ path: rootEnvPath, override: true });
+  // Load backend/.env / local .env with highest priority (overriding root)
+  if (fs.existsSync(backendEnvPath)) dotenv.config({ path: backendEnvPath, override: true });
+  if (fs.existsSync(localEnvPath)) dotenv.config({ path: localEnvPath, override: true });
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing GEMINI_API_KEY environment variable. Please ensure GEMINI_API_KEY is set in your .env file.");
+    throw new Error("Missing GEMINI_API_KEY environment variable. Please ensure GEMINI_API_KEY is set in your backend/.env file.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -290,42 +296,55 @@ ${inputInformation}
 `;
 
   const ai = getAiClient();
-  const maxRetries = 3;
+  const models = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro"];
+  let lastError: any = null;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
+  for (const modelName of models) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        console.log(`[Gemini] Requesting repair/replace analysis via model: ${modelName}...`);
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+        });
 
-      const text = response.text;
+        const text = response.text;
 
-      if (!text) {
-        throw new Error("No response text from AI model");
+        if (!text) {
+          throw new Error("No response text from AI model");
+        }
+
+        const cleanedText = text
+          .replace(/^```json\s*/i, "")
+          .replace(/^```\s*/i, "")
+          .replace(/\s*```$/i, "")
+          .trim();
+
+        console.log(`[Gemini] Repair/replace analysis succeeded with model: ${modelName}`);
+        return JSON.parse(cleanedText) as RepairReplaceAnalysisResult;
+      } catch (error: any) {
+        lastError = error;
+        const isRateLimit = error?.status === 429 || /quota|resource_exhausted|429/i.test(String(error));
+        const isNotFound = error?.status === 404 || /not found|404|no longer available/i.test(String(error));
+
+        if (isRateLimit || isNotFound) {
+          console.warn(`[Gemini] Model ${modelName} returned ${error?.status || "error"} (${error?.message}). Trying next fallback model...`);
+          break; // Try next model immediately
+        }
+
+        const isTimeout =
+          error?.cause?.code === "ETIMEDOUT" ||
+          /fetch failed|timed out/i.test(String(error));
+
+        if (!isTimeout || attempt === 2) {
+          break;
+        }
+
+        const delay = attempt * 1000;
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-
-      const cleanedText = text
-        .replace(/^```json\s*/i, "")
-        .replace(/^```\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-
-      return JSON.parse(cleanedText) as RepairReplaceAnalysisResult;
-    } catch (error: any) {
-      const isTimeout =
-        error?.cause?.code === "ETIMEDOUT" ||
-        /fetch failed|timed out/i.test(String(error));
-
-      if (!isTimeout || attempt === maxRetries) {
-        throw error;
-      }
-
-      const delay = attempt * 1000;
-
-      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 
-  throw new Error("Gemini request failed after retries");
+  throw lastError || new Error("Gemini request failed after trying fallback models");
 };

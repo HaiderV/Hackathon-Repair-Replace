@@ -22,10 +22,16 @@ if (fs.existsSync(rootEnvPath)) {
 }
 
 const getAiClient = () => {
+    // Load root .env first as fallback
+    if (fs.existsSync(rootEnvPath)) dotenv.config({ path: rootEnvPath, override: true });
+    // Load backend/.env / local .env with highest priority (overriding root)
+    if (fs.existsSync(backendEnvPath)) dotenv.config({ path: backendEnvPath, override: true });
+    if (fs.existsSync(localEnvPath)) dotenv.config({ path: localEnvPath, override: true });
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
-        throw new Error("Missing GEMINI_API_KEY environment variable.");
+        throw new Error("Missing GEMINI_API_KEY environment variable. Please ensure GEMINI_API_KEY is set in your backend/.env file.");
     }
 
     return new GoogleGenAI({ apiKey });
@@ -123,59 +129,71 @@ Return ONLY valid JSON:
 `;
 
     const ai = getAiClient();
+    const models = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro"];
+    let lastError: any = null;
 
-    const maxRetries = 3;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: [
-                    {
-                        parts: [
-                            {
-                                text: prompt,
-                            },
-                            {
-                                inlineData: {
-                                    mimeType,
-                                    data: imageBuffer.toString("base64"),
+    for (const modelName of models) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                console.log(`[Gemini] Requesting image analysis via model: ${modelName}...`);
+                const response = await ai.models.generateContent({
+                    model: modelName,
+                    contents: [
+                        {
+                            parts: [
+                                {
+                                    text: prompt,
                                 },
-                            },
-                        ],
-                    },
-                ],
-            });
+                                {
+                                    inlineData: {
+                                        mimeType,
+                                        data: imageBuffer.toString("base64"),
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                });
 
-            const text = response.text;
+                const text = response.text;
 
-            if (!text) {
-                throw new Error("No response text from image analysis AI");
+                if (!text) {
+                    throw new Error("No response text from image analysis AI");
+                }
+
+                const cleanedText = text
+                    .replace(/^```json\s*/i, "")
+                    .replace(/^```\s*/i, "")
+                    .replace(/\s*```$/i, "")
+                    .trim();
+
+                console.log(`[Gemini] Image analysis succeeded with model: ${modelName}`);
+                return JSON.parse(cleanedText) as ImageAnalysisResult;
+
+            } catch (error: any) {
+                lastError = error;
+                const isRateLimit = error?.status === 429 || /quota|resource_exhausted|429/i.test(String(error));
+                const isNotFound = error?.status === 404 || /not found|404|no longer available/i.test(String(error));
+
+                if (isRateLimit || isNotFound) {
+                    console.warn(`[Gemini] Model ${modelName} returned ${error?.status || "error"} (${error?.message}). Trying next fallback model...`);
+                    break; // Try next fallback model immediately
+                }
+
+                const isTimeout =
+                    error?.cause?.code === "ETIMEDOUT" ||
+                    /fetch failed|timed out/i.test(String(error));
+
+                if (!isTimeout || attempt === 2) {
+                    break;
+                }
+
+                await new Promise((resolve) =>
+                    setTimeout(resolve, attempt * 1000),
+                );
             }
-
-            const cleanedText = text
-                .replace(/^```json\s*/i, "")
-                .replace(/^```\s*/i, "")
-                .replace(/\s*```$/i, "")
-                .trim();
-
-            return JSON.parse(cleanedText) as ImageAnalysisResult;
-
-        } catch (error: any) {
-
-            const isTimeout =
-                error?.cause?.code === "ETIMEDOUT" ||
-                /fetch failed|timed out/i.test(String(error));
-
-            if (!isTimeout || attempt === maxRetries) {
-                throw error;
-            }
-
-            await new Promise((resolve) =>
-                setTimeout(resolve, attempt * 1000),
-            );
         }
     }
 
-    throw new Error("Image analysis failed after retries");
-};
+    throw lastError || new Error("Image analysis failed after trying fallback models");
+};

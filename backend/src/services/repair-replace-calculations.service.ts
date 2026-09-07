@@ -6,33 +6,74 @@ import type {
 
 export type RepairReplaceCalculationResult = RepairReplaceCalculation;
 
+const normalizeCostRange = (range?: Partial<CostRange> | null): CostRange => {
+    const min = typeof range?.min === "number" && !isNaN(range.min) ? range.min : 0;
+    const max = typeof range?.max === "number" && !isNaN(range.max) ? range.max : min;
+    const average =
+        typeof range?.average === "number" && !isNaN(range.average)
+            ? range.average
+            : (min + max) / 2;
+    return { min, max, average };
+};
+
 export const calculateRepairReplace = (
     analysis: RepairReplaceAnalysisResult,
 ): RepairReplaceCalculationResult => {
+    const repair = analysis?.repair || {
+        possible: false,
+        difficulty: { score: 100, level: "not_possible" as const },
+        cost: {
+            materials: { min: 0, max: 0, average: 0 },
+            tools: { min: 0, max: 0, average: 0 },
+            professionalLabor: { min: 0, max: 0, average: 0 },
+        },
+        time: { minMinutes: 0, maxMinutes: 0, averageMinutes: 0 },
+        tools: [],
+        materials: [],
+        steps: [],
+    };
+
+    const replacement = analysis?.replacement || {
+        possible: true,
+        cost: { min: 0, max: 0, average: 0 },
+        time: { minDays: 0, maxDays: 0, averageDays: 0 },
+        reason: "Replacement assessment",
+    };
+
+    const safety = analysis?.safety || {
+        score: 0,
+        level: "low" as const,
+        warning: null,
+    };
+
     /*
      * --------------------------------------------------
      * 1. Calculate MATERIAL COST
      * --------------------------------------------------
      */
 
-    const requiredMaterials = analysis.repair.materials.filter(
-        (material) => material.required,
-    );
+    const materialsList = Array.isArray(repair.materials) ? repair.materials : [];
+    const requiredMaterials = materialsList.filter((m) => m && m.required);
 
-    const materialCost = requiredMaterials.reduce(
-        (total, material) => {
-            return {
-                min: total.min + material.estimatedPrice.min,
-                max: total.max + material.estimatedPrice.max,
-                average: total.average + material.estimatedPrice.average,
-            };
-        },
-        {
-            min: 0,
-            max: 0,
-            average: 0,
-        },
-    );
+    let materialCost: CostRange;
+
+    if (requiredMaterials.length > 0) {
+        materialCost = requiredMaterials.reduce<CostRange>(
+            (total, material) => {
+                const price = normalizeCostRange(material.estimatedPrice);
+                return {
+                    min: total.min + price.min,
+                    max: total.max + price.max,
+                    average: total.average + price.average,
+                };
+            },
+            { min: 0, max: 0, average: 0 },
+        );
+    } else if (repair.cost?.materials) {
+        materialCost = normalizeCostRange(repair.cost.materials);
+    } else {
+        materialCost = { min: 0, max: 0, average: 0 };
+    }
 
     /*
      * --------------------------------------------------
@@ -40,30 +81,32 @@ export const calculateRepairReplace = (
      * --------------------------------------------------
      */
 
-    const requiredTools = analysis.repair.tools.filter(
-        (tool) => tool.required,
-    );
+    const toolsList = Array.isArray(repair.tools) ? repair.tools : [];
+    const requiredTools = toolsList.filter((t) => t && t.required);
 
-    const toolCost = requiredTools.reduce(
-        (total, tool) => {
-            return {
-                min: total.min + tool.estimatedPrice.min,
-                max: total.max + tool.estimatedPrice.max,
-                average: total.average + tool.estimatedPrice.average,
-            };
-        },
-        {
-            min: 0,
-            max: 0,
-            average: 0,
-        },
-    );
+    let toolCost: CostRange;
+
+    if (requiredTools.length > 0) {
+        toolCost = requiredTools.reduce<CostRange>(
+            (total, tool) => {
+                const price = normalizeCostRange(tool.estimatedPrice);
+                return {
+                    min: total.min + price.min,
+                    max: total.max + price.max,
+                    average: total.average + price.average,
+                };
+            },
+            { min: 0, max: 0, average: 0 },
+        );
+    } else if (repair.cost?.tools) {
+        toolCost = normalizeCostRange(repair.cost.tools);
+    } else {
+        toolCost = { min: 0, max: 0, average: 0 };
+    }
 
     /*
      * --------------------------------------------------
-     * 3. DIY REPAIR COST
-     *
-     * Materials + required tools
+     * 3. DIY REPAIR COST (Materials + required tools)
      * --------------------------------------------------
      */
 
@@ -75,16 +118,11 @@ export const calculateRepairReplace = (
 
     /*
      * --------------------------------------------------
-     * 4. PROFESSIONAL REPAIR COST
-     *
-     * Materials + professional labor
-     *
-     * Tools are NOT included because a professional
-     * should already have the required tools.
+     * 4. PROFESSIONAL REPAIR COST (Materials + professional labor)
      * --------------------------------------------------
      */
 
-    const laborCost = analysis.repair.cost.professionalLabor;
+    const laborCost = normalizeCostRange(repair.cost?.professionalLabor);
 
     const professionalRepairCost: CostRange = {
         min: materialCost.min + laborCost.min,
@@ -98,18 +136,11 @@ export const calculateRepairReplace = (
      * --------------------------------------------------
      */
 
-    const replacementCost = analysis.replacement.cost;
+    const replacementCost = normalizeCostRange(replacement.cost);
 
     /*
      * --------------------------------------------------
      * 6. COST RATIOS
-     *
-     * Example:
-     *
-     * Repair = ₹335
-     * Replace = ₹1750
-     *
-     * 335 / 1750 = 0.1914
      * --------------------------------------------------
      */
 
@@ -124,9 +155,7 @@ export const calculateRepairReplace = (
             : 1;
 
     const diyRepairCostPercentage = diyRepairCostRatio * 100;
-
-    const professionalRepairCostPercentage =
-        professionalRepairCostRatio * 100;
+    const professionalRepairCostPercentage = professionalRepairCostRatio * 100;
 
     /*
      * --------------------------------------------------
@@ -151,84 +180,43 @@ export const calculateRepairReplace = (
             : 0;
 
     /*
- * --------------------------------------------------
- * 8. SCORE EACH FACTOR
- * --------------------------------------------------
- */
-
-    /*
-     * COST SCORE
-     *
-     * Lower repair cost compared to replacement
-     * = higher repair score.
-     *
-     * Example:
-     *
-     * Repair = 20% of replacement
-     * Cost score = 80
+     * --------------------------------------------------
+     * 8. SCORE EACH FACTOR
+     * --------------------------------------------------
      */
-    const costScore = analysis.repair.possible
-        ? Math.max(
-            0,
-            Math.min(100, 100 - diyRepairCostPercentage),
-        )
+
+    const isRepairPossible = Boolean(repair.possible);
+
+    const costScore = isRepairPossible
+        ? Math.max(0, Math.min(100, 100 - diyRepairCostPercentage))
         : 0;
 
-    /*
-     * FEASIBILITY SCORE
-     */
-    const feasibilityScore = analysis.repair.possible
-        ? 100
+    const feasibilityScore = isRepairPossible ? 100 : 0;
+
+    const difficultyScore = isRepairPossible
+        ? Math.max(
+              0,
+              Math.min(
+                  100,
+                  100 - (typeof repair.difficulty?.score === "number" ? repair.difficulty.score : 50),
+              ),
+          )
         : 0;
 
-    /*
-     * DIFFICULTY SCORE
-     *
-     * Gemini:
-     * 0 = easy
-     * 100 = extremely difficult
-     *
-     * We invert it because an easier repair
-     * should receive a higher repair score.
-     */
-    const difficultyScore = analysis.repair.possible
+    const safetyScore = isRepairPossible
         ? Math.max(
-            0,
-            Math.min(
-                100,
-                100 - analysis.repair.difficulty.score,
-            ),
-        )
-        : 0;
-
-    /*
-     * SAFETY SCORE
-     *
-     * Gemini:
-     * 0 = very safe
-     * 100 = very dangerous
-     *
-     * We invert it.
-     */
-    const safetyScore = analysis.repair.possible
-        ? Math.max(
-            0,
-            Math.min(
-                100,
-                100 - analysis.safety.score,
-            ),
-        )
+              0,
+              Math.min(
+                  100,
+                  100 - (typeof safety.score === "number" ? safety.score : 50),
+              ),
+          )
         : 0;
 
     /*
      * --------------------------------------------------
      * 9. WEIGHTED REPAIR SCORE
      * --------------------------------------------------
-     *
-     * Cost        = 40%
-     * Feasibility = 25%
-     * Difficulty  = 20%
-     * Safety      = 15%
      */
 
     const repairScore =
@@ -247,11 +235,11 @@ export const calculateRepairReplace = (
 
     let recommendation: "repair" | "replace" | "both" | "neither";
 
-    if (!analysis.repair.possible && !analysis.replacement.possible) {
+    if (!repair.possible && !replacement.possible) {
         recommendation = "neither";
-    } else if (!analysis.repair.possible) {
+    } else if (!repair.possible) {
         recommendation = "replace";
-    } else if (!analysis.replacement.possible) {
+    } else if (!replacement.possible) {
         recommendation = "repair";
     } else if (repairScore >= 65) {
         recommendation = "repair";
@@ -265,7 +253,7 @@ export const calculateRepairReplace = (
      * --------------------------------------------------
      * 11. RETURN
      * --------------------------------------------------
-    */
+     */
 
     return {
         repairCost: {
@@ -315,13 +303,14 @@ export const calculateRepairReplace = (
 };
 
 const round = (value: number): number => {
+    if (isNaN(value)) return 0;
     return Math.round(value * 100) / 100;
 };
 
 const roundCost = (cost: CostRange): CostRange => {
     return {
-        min: Math.round(cost.min),
-        max: Math.round(cost.max),
-        average: Math.round(cost.average),
+        min: Math.round(cost.min || 0),
+        max: Math.round(cost.max || 0),
+        average: Math.round(cost.average || 0),
     };
 };

@@ -108,10 +108,14 @@ export const analyzeProblem = async (req: Request, res: Response) => {
           );
         }
 
-        return res.status(503).json({
+        const is429 = (error as any)?.status === 429 || /quota|resource_exhausted|429/i.test(String(error));
+        const message = is429
+          ? "AI API rate limit or quota reached (HTTP 429). Please verify your GEMINI_API_KEY in backend/.env."
+          : ((error as any)?.message || "Image analysis service is temporarily unavailable. Please try again later.");
+
+        return res.status(is429 ? 429 : 503).json({
           success: false,
-          message:
-            "Image analysis service is temporarily unavailable. Please try again later.",
+          message,
         });
       }
 
@@ -166,13 +170,17 @@ export const analyzeProblem = async (req: Request, res: Response) => {
       } else {
         analysis.status = "collecting_information";
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Gemini analysis failed:", error);
 
-      return res.status(503).json({
+      const is429 = error?.status === 429 || /quota|resource_exhausted|429/i.test(String(error));
+      const message = is429
+        ? "AI API rate limit or quota reached (HTTP 429). Please verify your GEMINI_API_KEY in backend/.env."
+        : (error?.message || "AI analysis service is temporarily unavailable. Please try again later.");
+
+      return res.status(is429 ? 429 : 503).json({
         success: false,
-        message:
-          "AI analysis service is temporarily unavailable. Please try again later.",
+        message,
       });
     }
 
