@@ -2,8 +2,6 @@ import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { IconX, IconMenu } from "./Icons"
 
-const logo = "/logo.png"
-
 export default function Nav() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
@@ -37,7 +35,7 @@ export default function Nav() {
               padding: 0,
             }}
           >
-            <img src={logo} alt="Logo" style={{ height: "62px", width: "auto" }} />
+            <img src="/logo.png" alt="Logo" style={{ height: "62px", width: "auto" }} />
             <span
               style={{
                 fontFamily: "Fraunces, Georgia, serif",
