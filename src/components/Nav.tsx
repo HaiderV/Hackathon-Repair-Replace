@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { IconX, IconMenu } from "./Icons"
-import logo from "../assets/logo.png"
+import { IconX, IconMenu, IconWrench } from "./Icons"
 
 export default function Nav() {
   const [open, setOpen] = useState(false)
@@ -28,7 +27,7 @@ export default function Nav() {
           <Link
             to="/"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-1 group"
+            className="flex items-center gap-2.5 group"
             style={{
               textDecoration: "none",
               background: "none",
@@ -36,7 +35,17 @@ export default function Nav() {
               padding: 0,
             }}
           >
-            <img src={logo} alt="Logo" style={{ height: "62px", width: "auto" }} />
+            <div
+              className="flex items-center justify-center rounded-xl shrink-0 aspect-square"
+              style={{
+                width: 36,
+                height: 36,
+                background: "#6C79C0",
+                boxShadow: "2px 2px 0 rgba(205,187,157,0.9)",
+              }}
+            >
+              <IconWrench size={19} className="text-white -rotate-12" />
+            </div>
             <span
               style={{
                 fontFamily: "Fraunces, Georgia, serif",
